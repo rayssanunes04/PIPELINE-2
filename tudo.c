@@ -59,9 +59,10 @@ struct DI_EX {
     int pc;
     int rs, rt, rd;
     int rs_val, rt_val;
-    int imm;               // imediato da instrucao
-    int destino;           // RC: registrador destino transportado pelo pipeline
-    struct controle ctrl;  // RC: sinais de controle transportados pelo pipeline
+    int imm;
+    int destino;
+    int opcode;
+    struct controle ctrl;
 };
 
 // RC: Transportar registrador destino e sinais de controle pelo pipeline
@@ -69,11 +70,12 @@ struct DI_EX {
 struct EX_MEM {
     int resultado_ula;
     int rt_val;
-    int destino;   // RC: registrador destino transportado
-    int zero;      // RC: flag de desvio para BEQ
-    int mem_read;  // RC: sinal de controle transportado
-    int mem_write; // RC: sinal de controle transportado
-    int reg_write; // RC: sinal de controle transportado
+    int destino;
+    int opcode;
+    int zero;
+    int mem_read;
+    int mem_write;
+    int reg_write;
 };
 
 // RC: Transportar registrador destino e sinais de controle pelo pipeline
@@ -81,8 +83,9 @@ struct EX_MEM {
 struct MEM_ER {
     int dado_memoria;
     int resultado_ula;
-    int destino;   // RC: registrador destino transportado
-    int reg_write; // RC: sinal de controle transportado
+    int destino;
+    int reg_write;
+    int mem_read;
 };
 
 // RC: Transportar registrador destino e sinais de controle pelo pipeline
