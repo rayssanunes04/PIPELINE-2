@@ -5,16 +5,17 @@
 #define DATA_SIZE 256
 #define INSTR_SIZE 16
 #define REG_COUNT 8
-#define HISTORICO_SIZE 100 // RC: arrumar o back para fazer varios - tamanho do historico
+#define HISTORICO_SIZE 100 
+
 
 enum classe_inst {
-    tipo_I,
+    tipo_I, 
     tipo_J,
     tipo_R
 };
 
-struct instrucao {
-    enum classe_inst tipo_inst;
+struct instrucao { // ins decodificada
+    enum classe_inst tipo_inst; //Guarda se é tipo R, I ou J após decodificação.
     char inst_char[INSTR_SIZE + 1];
     int opcode;
     int rs, rt, rd;
@@ -23,6 +24,7 @@ struct instrucao {
     int addr;
 };
 
+//lw e sw
 struct memoria_dados {
     int dados[DATA_SIZE];
 };
@@ -45,28 +47,25 @@ struct controle {
     int reg_write;
 };
 
-// RC: Transportar registrador destino e sinais de controle pelo pipeline
-// Registrador de pipeline BI/DI: guarda instrucao buscada e PC
+// Guarda a instrução buscada na etapa BI, para passar para DI no próximo ciclo.
 struct BI_DI {
     struct instrucao inst;
     int pc;
-    int pc_next;
+    int pc_next; // pc + 1
 };
 
-// RC: Transportar registrador destino e sinais de controle pelo pipeline
-// Registrador de pipeline DI/EX: guarda valores lidos dos registradores, destino e controle
+
 struct DI_EX {
     int pc;
     int rs, rt, rd;
-    int rs_val, rt_val;
+    int rs_val, rt_val; // Valores lidos dos registradores rs e rt. São os operandos A e B que vão para a ULA.
     int imm;
     int destino;
     int opcode;
     struct controle ctrl;
 };
 
-// RC: Transportar registrador destino e sinais de controle pelo pipeline
-// Registrador de pipeline EX/MEM: guarda resultado da ULA, destino e controle
+//Resultado calculado pela ULA no estágio EX
 struct EX_MEM {
     int resultado_ula;
     int rt_val;
@@ -78,8 +77,7 @@ struct EX_MEM {
     int reg_write;
 };
 
-// RC: Transportar registrador destino e sinais de controle pelo pipeline
-// Registrador de pipeline MEM/ER: guarda dado da memoria, resultado e destino
+
 struct MEM_ER {
     int dado_memoria;
     int resultado_ula;
@@ -88,33 +86,31 @@ struct MEM_ER {
     int mem_read;
 };
 
-// RC: Transportar registrador destino e sinais de controle pelo pipeline
-// struct simulador atualizada com os 4 registradores de pipeline
 struct simulador {
-    struct memoria_dados dmem;
+    struct memoria_dados dmem; //mem de dados
     struct pc pc;
     int reg[REG_COUNT];
-    struct instrucao *programa;
+    struct instrucao *programa; // ponteiro para as instruções lidas do arquivo e quantas são
     int prog_size;
 
     struct ULA ula;
     struct controle ctrl;
 
-    struct BI_DI bi_di;   // RC: registrador pipeline BI/DI
-    struct DI_EX di_ex;   // RC: registrador pipeline DI/EX
-    struct EX_MEM ex_mem; // RC: registrador pipeline EX/MEM
-    struct MEM_ER mem_er; // RC: registrador pipeline MEM/ER
+    struct BI_DI bi_di; // reg busca e decodificação
+    struct DI_EX di_ex;   // reg decodificação e execução
+    struct EX_MEM ex_mem; //reg execução e memória
+    struct MEM_ER mem_er; //reg memória e escrita
 
-    // RC: arrumar o back para fazer varios - historico de estados
     int historico_pc[HISTORICO_SIZE];
     int topo_historico;
 };
 
-
+//Só imprime o valor do PC atual, case 6
 void mostrar_pc(struct simulador *sim) {
     printf("\nPC atual: %d\n", sim->pc.pc);
 }
 
+// mostra a int decodificada
 void mostrar_instrucao(struct instrucao *inst) {
 
     printf("Tipo: ");
@@ -138,6 +134,7 @@ void mostrar_instrucao(struct instrucao *inst) {
     }
 }
 
+//quantas posiçoes quer preencher, com isso salva na nossa memoria de dados 
 void digitar_memoria(struct memoria_dados *mem) {
 
     int n, pos, valor;
@@ -160,6 +157,7 @@ void digitar_memoria(struct memoria_dados *mem) {
     }
 }
 
+
 void definir_registradores(int reg[]) {
 
     printf("\n=== DEFINIR REGISTRADORES (R0 a R7) ===\n");
@@ -170,6 +168,7 @@ void definir_registradores(int reg[]) {
     }
 }
 
+//Percorre as 256 posições e imprime só as que não são zero
 void imprimir_memoria(struct memoria_dados *mem) {
     int i;
 
@@ -192,34 +191,34 @@ void mostrar_registradores(int reg[]) {
     }
 }
 
-// RC: mostrar estado dos registradores de pipeline
+//
 void mostrar_pipeline(struct simulador *sim) {
 
     printf("\n========== PIPELINE DE REGISTRADORES ==========\n");
 
     printf("\n[BI/DI]\n");
-    printf("PC = %d\n", sim->bi_di.pc);
-    printf("PC_NEXT = %d\n", sim->bi_di.pc_next);
-    printf("INST = %s\n", sim->bi_di.inst.inst_char);
+    printf("PC = %d\n", sim->bi_di.pc); // PC da instrução que foi buscada
+    printf("PC_NEXT = %d\n", sim->bi_di.pc_next); // PC+1, o próximo
+    printf("INST = %s\n", sim->bi_di.inst.inst_char); // a instrução em binário
 
     printf("\n[DI/EX]\n");
-    printf("RS = %d\n", sim->di_ex.rs);
-    printf("RT = %d\n", sim->di_ex.rt);
-    printf("RD = %d\n", sim->di_ex.rd);
-    printf("RS_VAL = %d\n", sim->di_ex.rs_val);
-    printf("RT_VAL = %d\n", sim->di_ex.rt_val);
-    printf("IMM = %d\n", sim->di_ex.imm);
+    printf("RS = %d\n", sim->di_ex.rs); // n do reg fonte 1 
+    printf("RT = %d\n", sim->di_ex.rt); // fonte 2
+    printf("RD = %d\n", sim->di_ex.rd); // número do registrador destino (tipo R)
+    printf("RS_VAL = %d\n", sim->di_ex.rs_val); // valor lido de RS
+    printf("RT_VAL = %d\n", sim->di_ex.rt_val); // valor lido de RT
+    printf("IMM = %d\n", sim->di_ex.imm); // imediato (tipo I)
     printf("DESTINO = %d\n", sim->di_ex.destino);
 
     printf("\n[EX/MEM]\n");
-    printf("RESULTADO ULA = %d\n", sim->ex_mem.resultado_ula);
+    printf("RESULTADO ULA = %d\n", sim->ex_mem.resultado_ula); // oq a ULA calculou 
     printf("DESTINO = %d\n", sim->ex_mem.destino);
-    printf("ZERO = %d\n", sim->ex_mem.zero);
+    printf("ZERO = %d\n", sim->ex_mem.zero); // falg do bew
 
     printf("\n[MEM/ER]\n");
-    printf("DADO MEMORIA = %d\n", sim->mem_er.dado_memoria);
-    printf("RESULTADO ULA = %d\n", sim->mem_er.resultado_ula);
-    printf("DESTINO = %d\n", sim->mem_er.destino);
+    printf("DADO MEMORIA = %d\n", sim->mem_er.dado_memoria); //valor lido da memória (LW)
+    printf("RESULTADO ULA = %d\n", sim->mem_er.resultado_ula); //resultado repassado
+    printf("DESTINO = %d\n", sim->mem_er.destino); //destino final
 
     printf("\n================================================\n");
 }
@@ -234,7 +233,7 @@ int executar_ula(struct ULA *ula, int op) {
         default: ula->resultado = 0; break;
     }
 
-    return ula->resultado;
+    return ula->resultado; // salva
 }
 
 void unidade_controle(struct instrucao *inst, struct controle *ctrl) {
@@ -245,19 +244,19 @@ void unidade_controle(struct instrucao *inst, struct controle *ctrl) {
     ctrl->reg_write = 0;
 
     if (inst->tipo_inst == tipo_R) {
-        ctrl->reg_write = 1;
+        ctrl->reg_write = 1; //tipo R sempre escreve no registrador
         ctrl->alu_op = inst->funct;
     }
     else if (inst->tipo_inst == tipo_I) {
-        if (inst->opcode == 8) {
+        if (inst->opcode == 8) { //ADDI
             ctrl->reg_write = 1;
-            ctrl->alu_op = 0;
+            ctrl->alu_op = 0; //SOMA
         }
-        else if (inst->opcode == 4) {
-            ctrl->mem_read = 1;
+        else if (inst->opcode == 4) { //LW
+            ctrl->mem_read = 1; 
             ctrl->reg_write = 1;
         }
-        else if (inst->opcode == 5) {
+        else if (inst->opcode == 5) { //sw
             ctrl->mem_write = 1;
         }
     }
@@ -298,29 +297,22 @@ void decodificador(struct instrucao *inst) {
 }
 
 
-// ============================================================
-// RC: Atualizar run_simulation para pipeline
-// Estagio 1 - Busca (BI): le instrucao e avanca PC
-// ============================================================
+
 void estagio_busca(struct simulador *sim) {
 
     if (sim->pc.pc >= sim->prog_size) return;
 
     sim->bi_di.inst    = sim->programa[sim->pc.pc]; // copia instrucao para BI/DI
-    sim->bi_di.pc      = sim->pc.pc;
-    sim->bi_di.pc_next = sim->pc.pc + 1;
+    sim->bi_di.pc      = sim->pc.pc; // salva o PC atual no registrador
+    sim->bi_di.pc_next = sim->pc.pc + 1; //já calcula o próximo
 
-    sim->pc.pc++;
+    sim->pc.pc++; //  avança o PC
 }
 
-// ============================================================
-// RC: Atualizar run_simulation para pipeline
-// Estagio 2 - Decodificacao (DI): le registradores e gera controle
-// RC: Transportar registrador destino e sinais de controle pelo pipeline
-// ============================================================
+
 void estagio_decodificacao(struct simulador *sim) {
 
-    struct instrucao *inst = &sim->bi_di.inst;
+    struct instrucao *inst = &sim->bi_di.inst; // pega a instrução que está no BI/DI
 
     if (inst->inst_char[0] == '\0') return;
 
@@ -348,12 +340,7 @@ void estagio_decodificacao(struct simulador *sim) {
     sim->di_ex.ctrl = ctrl;
 }
 
-// ============================================================
-// RC: Atualizar run_simulation para pipeline
-// Estagio 3 - Execucao (EX): opera a ULA
-// RC: Transportar registrador destino e sinais de controle pelo pipeline
-// RC: Adicionar desvios no pipeline (BEQ calcula zero aqui)
-// ============================================================
+
 void estagio_execucao(struct simulador *sim) {
 
     struct DI_EX *d = &sim->di_ex;
@@ -366,31 +353,27 @@ void estagio_execucao(struct simulador *sim) {
     sim->ex_mem.resultado_ula = sim->ula.resultado;
     sim->ex_mem.rt_val        = d->rt_val;
 
-    // RC: Transportar registrador destino pelo pipeline (DI_EX → EX_MEM)
+    //  Transportar registrador destino pelo pipeline (DI_EX → EX_MEM)
     sim->ex_mem.destino   = d->destino;
 
-    // RC: Adicionar desvios no pipeline
+    //  Adicionar desvios no pipeline
     // flag zero: 1 se rs_val == rt_val, usado pelo BEQ na etapa MEM
     sim->ex_mem.zero      = (d->rs_val == d->rt_val) ? 1 : 0;
 
-    // RC: Transportar sinais de controle pelo pipeline (EX → MEM)
+    // Transportar sinais de controle pelo pipeline (EX → MEM)
     sim->ex_mem.mem_read  = d->ctrl.mem_read;
     sim->ex_mem.mem_write = d->ctrl.mem_write;
     sim->ex_mem.reg_write = d->ctrl.reg_write;
 }
 
-// ============================================================
-// RC: Atualizar run_simulation para pipeline
-// Estagio 4 - Memoria (MEM): acessa memoria de dados
-// RC: Adicionar desvios no pipeline (BEQ desvia aqui)
-// ============================================================
+
 void estagio_memoria(struct simulador *sim) {
 
     struct EX_MEM *e = &sim->ex_mem;
 
     sim->mem_er.resultado_ula = e->resultado_ula;
 
-    // RC: Transportar registrador destino pelo pipeline (EX_MEM → MEM_ER)
+    //  Transportar registrador destino pelo pipeline (EX_MEM → MEM_ER)
     sim->mem_er.destino   = e->destino;
     sim->mem_er.reg_write = e->reg_write;
 
@@ -407,7 +390,7 @@ void estagio_memoria(struct simulador *sim) {
         sim->mem_er.dado_memoria = 0;
     }
 
-    // RC: Adicionar desvios no pipeline
+    //  Adicionar desvios no pipeline
     // BEQ: se zero=1, corrige o PC (desvio acontece no estagio MEM)
     // A instrucao BEQ tem opcode 9 - verificamos pelo opcode salvo em di_ex
     // Usamos o imediato de di_ex para calcular o alvo do desvio
@@ -418,15 +401,12 @@ void estagio_memoria(struct simulador *sim) {
     }
 }
 
-// ============================================================
-// RC: Atualizar run_simulation para pipeline
-// Estagio 5 - Escrita (ER): escreve resultado no banco de registradores
-// ============================================================
+
 void estagio_escrita(struct simulador *sim) {
 
     struct MEM_ER *m = &sim->mem_er;
 
-    // RC: Transportar registrador destino pelo pipeline - aqui ele e usado para gravar
+    //  Transportar registrador destino pelo pipeline - aqui ele e usado para gravar
     if (m->reg_write && m->destino != 0) {
         // LW escreve dado da memoria, demais escrevem resultado da ULA
         if (sim->ex_mem.mem_read)
@@ -437,27 +417,23 @@ void estagio_escrita(struct simulador *sim) {
 }
 
 
-// ============================================================
-// RC: Atualizar run_simulation para pipeline
-// step_simulation agora executa os 5 estagios do pipeline em ordem reversa
-// (reversa para simular que cada instrucao avanca um estagio por ciclo)
-// ============================================================
 void step_simulation(struct simulador *sim) {
 
     if (sim->pc.pc >= sim->prog_size && sim->bi_di.inst.inst_char[0] == '\0') {
         printf("Fim do programa\n");
         return;
+        // só para se o PC passou do fim E o BI/DI está vazio
+        // enquanto ainda tem instrução no pipeline, continua
     }
 
-    // RC: arrumar o back para fazer varios - salva PC antes de executar
+    // empilha o PC atual antes de executar, para o back poder voltar aqui
     if (sim->topo_historico < HISTORICO_SIZE) {
         sim->historico_pc[sim->topo_historico++] = sim->pc.pc;
     }
 
     printf("\n--- Ciclo: PC = %d ---\n", sim->pc.pc);
 
-    // RC: Atualizar run_simulation para pipeline
-    // estagios em ordem reversa para nao sobrescrever dados do ciclo atual
+   
     estagio_escrita(sim);            // ER usa MEM_ER
     estagio_memoria(sim);            // MEM usa EX_MEM
     estagio_execucao(sim);           // EX  usa DI_EX
@@ -468,21 +444,20 @@ void step_simulation(struct simulador *sim) {
 }
 
 
-// ============================================================
-// RC: Atualizar run_simulation para pipeline
-// run_simulation agora roda ciclos ate esvaziar o pipeline
-// ============================================================
 void run_simulation(struct simulador *sim) {
 
     // continua enquanto ainda ha instrucao no pipeline ou nao chegou ao fim
     while (sim->pc.pc < sim->prog_size) {
-        step_simulation(sim);
+        step_simulation(sim); 
     }
 
     // drena os estagios restantes do pipeline (flush)
     printf("\n[PIPELINE] Drenando pipeline...\n");
     int ciclos_drenagem = 4;
     while (ciclos_drenagem-- > 0) {
+        // pipeline tem 5 estágios, então após o último fetch
+        // ainda existem até 4 instruções dentro dos registradores
+        // esses 4 ciclos extras deixam todas elas chegarem ao ER
         estagio_escrita(sim);
         estagio_memoria(sim);
         estagio_execucao(sim);
@@ -492,10 +467,6 @@ void run_simulation(struct simulador *sim) {
 }
 
 
-// ============================================================
-// RC: Arrumar o back para fazer varios
-// agora usa pilha de historico para voltar multiplos passos
-// ============================================================
 void voltar_instrucao(struct simulador *sim) {
 
     if (sim->topo_historico <= 0) {
