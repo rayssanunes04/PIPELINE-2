@@ -103,7 +103,6 @@ struct simulador {
     int topo_historico;
 };
 
-/* ========== lógica do simulador (inalterada) ========== */
 
 int executar_ula(struct ULA *ula, int op) {
     switch(op) {
@@ -260,10 +259,7 @@ void estagio_memoria(struct simulador *sim) {
     } else {
         sim->mem_er.dado_memoria = 0;
     }
-    //  Adicionar desvios no pipeline
-    // BEQ: se zero=1 e a instrucao realmente e um BEQ (is_branch), corrige o PC
-    // (antes isso era detectado so pela ausencia de outros sinais, o que
-    //  causava desvio falso nas "bolhas" vazias do pipeline)
+    
     if (e->is_branch && e->zero) {
         // desvio: volta ao PC do BEQ e soma o imediato
         sim->pc.pc = sim->di_ex.pc + 1 + sim->di_ex.imm;
@@ -402,7 +398,7 @@ static void aguardar_tecla() {
     wgetch(win_info);
 }
 
-/* -------- telas de cada opção -------- */
+
 
 static void tela_registradores(struct simulador *sim) {
     limpar_info();
